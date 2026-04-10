@@ -1,0 +1,133 @@
+DEPLOY NA HOSTINGER (HOSPEDAGEM COMPARTILHADA)
+===============================================
+
+
+PASSO 1 - BUILD LOCAL (antes de fazer upload)
+----------------------------------------------
+Como nao tem npm na Hostinger, roda localmente:
+
+    npm run build
+
+Isso gera/atualiza a pasta public/build/ com os assets compilados.
+
+
+PASSO 2 - Preparar o .env para producao
+-----------------------------------------
+Crie um arquivo .env de producao com esses valores (adapte ao seu dominio):
+
+    APP_NAME="Nome do App"
+    APP_ENV=production
+    APP_KEY=base64:oLpPOCwH/aEGUkUBr/RJnOB5gOy8wI72RastOJOraTI=
+    APP_DEBUG=false
+    APP_URL=https://seudominio.com.br
+
+    LOG_CHANNEL=single
+
+    DB_CONNECTION=mysql
+    DB_HOST=127.0.0.1
+    DB_PORT=3306
+    DB_DATABASE=seu_banco
+    DB_USERNAME=seu_usuario
+    DB_PASSWORD=sua_senha
+
+    SESSION_DRIVER=file
+    CACHE_STORE=file
+    QUEUE_CONNECTION=sync
+
+
+PASSO 3 - Estrutura de pastas na Hostinger
+--------------------------------------------
+Na Hostinger, o public_html deve conter o conteudo de public/, nao a raiz do projeto.
+Estrutura correta:
+
+    /home/usuario/              <- raiz da conta
+    |-- public_html/            <- pasta publica (dominio aponta aqui)
+    |   |-- index.php           <- arquivo de entrada (modificado no Passo 4)
+    |   |-- .htaccess
+    |   |-- build/              <- assets compilados
+    |   `-- ...                 <- resto do public/
+    `-- laravel/                <- pasta fora do public_html
+        |-- app/
+        |-- bootstrap/
+        |-- config/
+        |-- database/
+        |-- resources/
+        |-- routes/
+        |-- storage/
+        |-- vendor/
+        |-- .env
+        `-- artisan
+
+
+PASSO 4 - Modificar o index.php
+---------------------------------
+O public/index.php precisa apontar para o Laravel fora do public_html.
+Edite as linhas:
+
+    DE:
+        require __DIR__.'/../vendor/autoload.php';
+        $app = require_once __DIR__.'/../bootstrap/app.php';
+
+    PARA (ajuste o caminho real da sua conta):
+        require __DIR__.'/../laravel/vendor/autoload.php';
+        $app = require_once __DIR__.'/../laravel/bootstrap/app.php';
+
+
+PASSO 5 - Upload dos arquivos
+-------------------------------
+Via File Manager ou FTP (FileZilla):
+
+    1. Suba o conteudo da pasta public/ para dentro de public_html/
+    2. Crie a pasta laravel/ fora do public_html e suba:
+       - app/, bootstrap/, config/, database/, resources/, routes/, storage/, vendor/
+       - .env (o de producao do Passo 2)
+       - artisan
+
+    NAO SUBA: node_modules/, .git/, tests/
+
+    DICA: Use zip para agilizar - compacte localmente, suba e extraia
+    pelo File Manager da Hostinger.
+
+
+PASSO 6 - Banco de dados
+--------------------------
+No painel Hostinger > Banco de dados MySQL:
+
+    1. Crie um banco de dados e usuario
+    2. Anote as credenciais e atualize o .env
+    3. Importe as migrations via SSH (se disponivel):
+           php artisan migrate --force
+       Ou importe um dump SQL pelo phpMyAdmin.
+
+
+PASSO 7 - Permissoes de pastas
+--------------------------------
+Via SSH ou File Manager, defina:
+
+    chmod -R 775 storage/
+    chmod -R 775 bootstrap/cache/
+
+
+PASSO 8 - Verificacoes finais (via SSH)
+-----------------------------------------
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+
+Se nao tiver SSH, essas etapas sao opcionais mas melhoram a performance.
+
+
+PROBLEMAS COMUNS NA HOSTINGER
+================================
+
+Tela branca / erro 500
+    -> Defina APP_DEBUG=true temporariamente para ver o erro
+
+Assets nao carregam (CSS/JS)
+    -> Verificar se public/build/ foi enviado corretamente
+
+Erro de session ou cache
+    -> Garantir permissao 775 em storage/ e bootstrap/cache/
+
+Versao PHP errada
+    -> Mudar para PHP 8.2 no painel da Hostinger (Configuracoes > PHP)
