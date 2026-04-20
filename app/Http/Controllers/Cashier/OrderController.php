@@ -78,9 +78,10 @@ class OrderController extends Controller
         }
 
         $order->update([
-            'status'         => OrderStatus::Closed,
-            'closed_at'      => now(),
+            'status' => OrderStatus::Closed,
+            'closed_at' => now(),
             'payment_method' => $validated['payment_method'],
+            'cashier_id' => $request->user()->id,
         ]);
 
         $table->update(['status' => TableStatus::Free]);
@@ -119,6 +120,7 @@ class OrderController extends Controller
         $order->load([
             'table',
             'waiter',
+            'cashier',
             'items' => fn ($q) => $q->with(['product', 'options.option', 'options.choice'])->orderBy('created_at'),
         ]);
 

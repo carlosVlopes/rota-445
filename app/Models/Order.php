@@ -13,6 +13,7 @@ class Order extends Model
     protected $fillable = [
         'table_id',
         'user_id',
+        'cashier_id',
         'status',
         'total',
         'payment_method',
@@ -39,6 +40,12 @@ class Order extends Model
     public function waiter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /** Caixa que fechou a comanda. */
+    public function cashier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cashier_id');
     }
 
     public function items(): HasMany

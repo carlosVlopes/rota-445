@@ -86,6 +86,17 @@
             <span x-show="sidebarOpen" x-transition class="whitespace-nowrap">Mesas</span>
         </a>
 
+        {{-- Pedidos Fechados --}}
+        <a href="{{ route('admin.pedidos.closed') }}"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors
+               {{ request()->routeIs('admin.pedidos.*') ? 'bg-orange-50 text-orange-600' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700' }}"
+           :title="!sidebarOpen ? 'Pedidos Fechados' : ''">
+            <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+            <span x-show="sidebarOpen" x-transition class="whitespace-nowrap">Pedidos Fechados</span>
+        </a>
+
         <div x-show="sidebarOpen" class="pt-3">
             <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2">Configurações</p>
         </div>

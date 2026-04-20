@@ -1,3 +1,80 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Laravel 12 app for a Brazilian "espetaria" (skewer restaurant) — waiters open table orders, kitchen prints tickets, cashier closes and charges. All user-facing strings/comments are in Portuguese; keep new copy in pt-BR.
+
+## Common Commands
+
+```bash
+# Dev (runs php artisan serve + queue:listen + vite concurrently)
+composer run dev
+
+# Frontend-only
+npm run dev        # Vite watcher
+npm run build      # Production build (required when deploying to Hostinger — see DEPLOY_HOSTINGER.txt)
+
+# Tests (Pest, defined in phpunit.xml with sqlite :memory:)
+php artisan test --compact
+php artisan test --compact --filter=testName
+php artisan make:test --pest MyFeatureTest
+php artisan make:test --pest --unit MyUnitTest
+
+# Code style (run after touching PHP)
+vendor/bin/pint --dirty --format agent
+
+# DB reset + seed (creates admin + PIN users — see UserSeeder)
+php artisan migrate:fresh --seed
+```
+
+Seeded login credentials (dev only): admin `admin@espetaria.com` / `password`; waiters PIN `1111` `2222` `3333`; cashier PIN `9999`.
+
+## Architecture
+
+Three role-based areas, all gated by middleware stack `['auth', 'active', 'role:<role>']`. Middleware aliases `role` and `active` are registered in [bootstrap/app.php](bootstrap/app.php) (Laravel 12 — no `Http/Kernel.php`).
+
+- **Waiter** (`/garcom`, `role:waiter`) — [app/Http/Controllers/Waiter/](app/Http/Controllers/Waiter/). Opens tables, builds orders, confirms items for kitchen printing.
+- **Cashier** (`/caixa`, `role:cashier`) — [app/Http/Controllers/Cashier/](app/Http/Controllers/Cashier/). Views open/occupied tables and closes orders with `payment_method` (dinheiro/credito/debito/pix).
+- **Admin** (`/admin`, `role:admin`) — [app/Http/Controllers/Admin/](app/Http/Controllers/Admin/). CRUD for products, categories, users, tables.
+
+### Auth ([app/Http/Controllers/Auth/LoginController.php](app/Http/Controllers/Auth/LoginController.php))
+
+Dual login flow: waiters/cashiers authenticate by **PIN only** (4–6 digits, no password); admins by email + password. `redirectByRole()` routes to the correct area post-login. `EnsureUserIsActive` logs out deactivated users on every request.
+
+### Order lifecycle (core domain — see also [resources/views/waiter/CONTEXT.md](resources/views/waiter/CONTEXT.md))
+
+State machines via enums in [app/Enums/](app/Enums/):
+
+- `Table.status`: `free` → `occupied` (waiter opens) → `waiting_payment` → `free` (cashier closes).
+- `Order.status`: `open` → `closed`. A `Table` has at most one `Order` with status `open` (see `Table::openOrder()` relation).
+- `OrderItem.status`: `pending` (editable) → `printing` (after waiter confirms; sequence assigned) → `delivered`.
+- `PrintJob.status`: `pending` → `sent` / `failed`. Created one-per-item on `confirm`, consumed by an external Node.js agent.
+
+Key invariants enforced in `Waiter\OrderController::authorizeOrder()`: abort 403 unless `order.status === Open && table.status === Occupied`. `Order.total` is recalculated from scratch on every `addItem`/`removeItem` via `recalculateTotal()`. `unit_price` on `OrderItem` and `price_delta` on `OrderItemOption` are **snapshots** — never re-derive from the current `Product`/`ProductOptionChoice`, since admins may change prices later.
+
+### Print pipeline
+
+`Waiter\OrderController::confirm()` is transactional:
+1. Assigns sequential `print_sequence` continuing from the max on the order (multiple confirmations per order).
+2. Creates a `PrintJob` per pending item with full JSON payload (`table`, `waiter`, product, options, notes).
+3. Flips items to `printing`.
+4. Dispatches `App\Events\OrderConfirmed` (implements `ShouldBroadcast`) on public channel `orders` as event `order.confirmed`. The Node agent consumes via Reverb.
+
+### Product options ([app/Enums/ProductOptionType.php](app/Enums/ProductOptionType.php))
+
+Four types, each mapped to a different UI control and payload shape in the waiter order page Alpine component — see the table in [resources/views/waiter/CONTEXT.md](resources/views/waiter/CONTEXT.md): `toggle` (checkbox, no choice), `select` (radio + choice_id), `extra` (multi checkbox, one row per selected choice), `text` (textarea + text_value).
+
+### Frontend
+
+- Tailwind v4 via `@tailwindcss/vite`, entry [resources/css/app.css](resources/css/app.css).
+- Alpine.js only — no Livewire. Main interactive component is `Alpine.data('orderPage', ...)` in [resources/js/app.js](resources/js/app.js). It reads seed data from `window.__ORDER__` (items, total, URLs, CSRF) set inline in the Blade view, and does add/remove via `fetch` with JSON responses. Other screens are server-rendered Blade with classic form submits.
+
+### Tests
+
+Pest 3 with Laravel plugin. [tests/Pest.php](tests/Pest.php) binds `Tests\TestCase` to `Feature/`. `RefreshDatabase` is **not** enabled globally — opt in per test if needed. Phpunit config uses sqlite in-memory, array cache/session, null broadcast.
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
